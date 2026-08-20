@@ -1,0 +1,20 @@
+workloads:
+  opendesign:
+    replicaCount: 1
+image:
+  repository: ghcr.io/nexu-io/od
+  tag: "0.19.1"
+  pullPolicy: IfNotPresent
+olaresEnv:
+  LLM_BASE_URL: "https://llm.aimighty.olares.de/v1"
+  LLM_API_KEY: ""
+service:
+  port: 80
+containerPort: 7456
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi

@@ -1,0 +1,163 @@
+{{- $origin := printf "https://%s" (index .Values.domain "opendesign" | default "opendesign.local") }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: opendesign
+spec:
+  replicas: {{ .Values.workloads.opendesign.replicaCount }}
+  selector:
+    matchLabels:
+      app: opendesign
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: opendesign
+    spec:
+      initContainers:
+        - name: init-permissions
+          image: beclab/aboveos-busybox:1.37.0
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data && chown 1000:1000 /data
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: app-data
+              mountPath: /data
+        - name: install-opencode
+          image: ghcr.io/nexu-io/od:0.19.1
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          env:
+            - name: LLM_BASE_URL
+              value: "{{ .Values.olaresEnv.LLM_BASE_URL }}"
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-app
+                  key: LLM_API_KEY
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /tools/opencode
+              wget -qO /tmp/oc.tar.gz "https://github.com/anomalyco/opencode/releases/download/v1.18.18/opencode-linux-x64-musl.tar.gz"
+              tar -xzf /tmp/oc.tar.gz -C /tools/opencode
+              chmod +x /tools/opencode/opencode
+              /tools/opencode/opencode --version
+              cat > /tools/opencode/opencode.json <<JSON
+              {
+                "provider": {
+                  "litellm": {
+                    "name": "LiteLLM",
+                    "npm": "@ai-sdk/openai-compatible",
+                    "options": {
+                      "baseURL": "$LLM_BASE_URL",
+                      "apiKey": "$LLM_API_KEY"
+                    },
+                    "models": {
+                      "Analyst": {
+                        "name": "Analyst",
+                        "max_ctx": 200000,
+                        "modalities": {
+                          "input": ["text", "image"]
+                        },
+                        "limit": { "context": 200000, "output": 32000 },
+                        "options": {
+                          "extraBody": { "chat_template_kwargs": { "enable_thinking": false } }
+                        }
+                      },
+                      "Experte": { "name": "Experte" }
+                    }
+                  }
+                },
+                "model": "litellm/Analyst"
+              }
+              JSON
+              chmod 0644 /tools/opencode/opencode.json
+          volumeMounts:
+            - name: tools
+              mountPath: /tools
+      containers:
+        - name: opendesign
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          env:
+            - name: HOME
+              value: /tools/opencode
+            - name: NODE_ENV
+              value: production
+            - name: NODE_OPTIONS
+              value: --max-old-space-size=192
+            - name: OD_BIND_HOST
+              value: 0.0.0.0
+            - name: OD_PORT
+              value: "{{ .Values.containerPort }}"
+            - name: OD_WEB_PORT
+              value: "{{ .Values.containerPort }}"
+            - name: OD_DISABLE_API_AUTH
+              value: "1"
+            - name: OD_PUBLIC_BASE_URL
+              value: "{{ $origin }}"
+            - name: OD_ALLOWED_ORIGINS
+              value: "{{ $origin }}"
+            - name: OD_ALLOWED_INTERNAL_HOSTS
+              value: "llm.aimighty.olares.de,172.20.0.4"
+            - name: OPENCODE_BIN
+              value: /tools/opencode/opencode
+            - name: OPENCODE_CONFIG
+              value: /tools/opencode/opencode.json
+          readinessProbe:
+            exec:
+              command: ["node", "-e", "fetch('http://127.0.0.1:7456/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["node", "-e", "fetch('http://127.0.0.1:7456/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: app-data
+              mountPath: /app/.od
+            - name: tmp
+              mountPath: /tmp
+            - name: tools
+              mountPath: /tools
+          resources:
+            limits:
+              cpu: "{{ .Values.resources.limits.cpu }}"
+              memory: "{{ .Values.resources.limits.memory }}"
+            requests:
+              cpu: "{{ .Values.resources.requests.cpu }}"
+              memory: "{{ .Values.resources.requests.memory }}"
+      volumes:
+        - name: app-data
+          hostPath:
+            path: {{ .Values.userspace.appData }}
+            type: DirectoryOrCreate
+        - name: tmp
+          emptyDir: {}
+        - name: tools
+          emptyDir: {}

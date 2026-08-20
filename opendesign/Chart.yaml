@@ -1,0 +1,6 @@
+apiVersion: v2
+name: opendesign
+description: A Helm chart for deploying Open Design on Olares
+type: application
+version: 26.08.10
+appVersion: "0.19.1"
