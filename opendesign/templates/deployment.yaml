@@ -115,9 +115,9 @@ spec:
             - name: OD_DISABLE_API_AUTH
               value: "1"
             - name: OD_PUBLIC_BASE_URL
-              value: "{{ $origin }}"
+              value: "{{ .Values.olaresEnv.OD_PUBLIC_BASE_URL | default $origin }}"
             - name: OD_ALLOWED_ORIGINS
-              value: "{{ $origin }}"
+              value: "{{ $origin }}{{ if .Values.olaresEnv.OD_ALLOWED_ORIGINS }},{{ .Values.olaresEnv.OD_ALLOWED_ORIGINS }}{{ end }}"
             - name: OD_ALLOWED_INTERNAL_HOSTS
               value: "llm.aimighty.olares.de,172.20.0.4"
             - name: OPENCODE_BIN

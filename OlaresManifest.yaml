@@ -9,7 +9,7 @@ metadata:
   description: Open-source Claude Design alternative — local-first design studio
   icon: https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fopen-design.ai%2Ffavicon.png&f=1&nofb=1&ipt=00000000000000000000000000000000
   title: Open Design
-  version: 26.08.10
+  version: 26.08.11
   categories:
     - Utilities
 permission:
@@ -28,6 +28,7 @@ spec:
     - Sandboxed iframe preview, live dashboards and artifacts
 
   upgradeDescription: |
+    v26.08.11: Configurable origins — OD_PUBLIC_BASE_URL / OD_ALLOWED_ORIGINS now come from app env (defaults to the primary entrance), so a custom route domain (e.g. design.aimighty.olares.de) works.
     v26.08.10: Env-configurable LLM gateway — opencode base URL + API key now come from app env (LLM_BASE_URL / LLM_API_KEY), no hardcoded credential in the chart.
     v26.08.1: Initial release. Built for Olares 1.12.6.
 
@@ -64,6 +65,18 @@ envs:
     editable: true
     applyOnChange: true
     description: "API key for LLM_BASE_URL."
+  - envName: OD_PUBLIC_BASE_URL
+    default: ""
+    type: url
+    editable: true
+    applyOnChange: true
+    description: "Public base URL the app advertises for generated links (defaults to the primary entrance)."
+  - envName: OD_ALLOWED_ORIGINS
+    default: ""
+    type: string
+    editable: true
+    applyOnChange: true
+    description: "Extra browser origins (comma-separated full URLs) the app accepts, e.g. a custom route such as https://design.aimighty.olares.de (the primary entrance is always allowed)."
 options:
   apiTimeout: 0
   dependencies:

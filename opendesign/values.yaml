@@ -8,6 +8,8 @@ image:
 olaresEnv:
   LLM_BASE_URL: "https://llm.aimighty.olares.de/v1"
   LLM_API_KEY: ""
+  OD_PUBLIC_BASE_URL: ""
+  OD_ALLOWED_ORIGINS: ""
 service:
   port: 80
 containerPort: 7456
